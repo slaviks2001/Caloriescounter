@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Calorie Counter</title>
+    <style>
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background-color: #121212;
+            color: #ffffff;
+        }
+        header {
+            text-align: center;
+            padding: 20px;
+            background: #1f1f1f;
+        }
+        header h1 {
+            margin: 0;
+            font-size: 2.5rem;
+            color: #ffa500;
+        }
+        nav {
+            text-align: center;
+            margin-top: 10px;
+        }
+        nav a {
+            margin: 0 15px;
+            color: #ffa500;
+            text-decoration: none;
+            font-size: 1.2rem;
+        }
+        nav a:hover {
+            text-decoration: underline;
+        }
+        .calorie-counter {
+            margin: 30px auto;
+            max-width: 600px;
+            padding: 20px;
+            background-color: #1f1f1f;
+            border-radius: 10px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+        }
+        .calorie-counter h2 {
+            text-align: center;
+            color: #ffa500;
+        }
+        .calorie-counter form {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .calorie-counter input, .calorie-counter button {
+            padding: 10px;
+            font-size: 1rem;
+            border: none;
+            border-radius: 5px;
+        }
+        .calorie-counter input {
+            background-color: #2c2c2c;
+            color: #ffffff;
+        }
+        .calorie-counter button {
+            background-color: #ffa500;
+            color: #121212;
+            cursor: pointer;
+        }
+        footer {
+            text-align: center;
+            padding: 20px;
+            background: #1f1f1f;
+            margin-top: 30px;
+        }
+        .delete-btn {
+            margin-left: 10px;
+            background-color: #ff5555;
+            padding: 5px 10px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.9rem;
+        }
+    </style>
+    <script>
+        let foodData = JSON.parse(localStorage.getItem('foodData')) || {};
+
+        function ensureDateExists(date) {
+            if (!foodData[date] || typeof foodData[date] !== 'object' || !Array.isArray(foodData[date].foods)) {
+                foodData[date] = { foods: [], goal: 2000 };
+            }
+        }
+
+        function formatDisplayDate(dateStr) {
+            if (!dateStr || !dateStr.includes('-')) return dateStr;
+            const parts = dateStr.split('-');
+            return parts[2] + '/' + parts[1] + '/' + parts[0];
+        }
+
+        function removeGlitch() {
+            if (foodData['2025-01-23']) {
+                foodData['2025-01-23'].foods = foodData['2025-01-23'].foods.filter(item => {
+                    return !(item.calories === 200);
+                });
+                localStorage.setItem('foodData', JSON.stringify(foodData));
+            }
+        }
+
+        function renderFoodData(date) {
+            ensureDateExists(date);
+            const foodList = document.getElementById('food-list');
+            const totalCalories = document.getElementById('total-calories');
+            const calorieGoal = document.getElementById('calorie-goal');
+            const caloriesLeftSpan = document.getElementById('calories-left');
+
+            foodList.innerHTML = '';
+
+            const dayTotal = foodData[date].foods.reduce((total, item, index) => {
+                const listItem = document.createElement('li');
+                listItem.textContent = item.name + ": " + item.calories + " calories";
+
+                // Create a delete button
+                const deleteButton = document.createElement('button');
+                deleteButton.innerText = "Delete";
+                deleteButton.className = "delete-btn";
+                deleteButton.addEventListener('click', () => {
+                    deleteFood(date, index);
+                });
+
+                listItem.appendChild(deleteButton);
+                foodList.appendChild(listItem);
+                return total + item.calories;
+            }, 0);
+
+            totalCalories.textContent = dayTotal;
+            calorieGoal.value = foodData[date].goal;
+
+            // Calculate and display how many calories are left to reach the goal
+            const dayLeft = foodData[date].goal - dayTotal;
+            caloriesLeftSpan.textContent = dayLeft;
+
+            localStorage.setItem('foodData', JSON.stringify(foodData));
+        }
+
+        // Function to delete a food by index
+        function deleteFood(date, index) {
+            ensureDateExists(date);
+            if (index >= 0 && index < foodData[date].foods.length) {
+                foodData[date].foods.splice(index, 1);
+                localStorage.setItem('foodData', JSON.stringify(foodData));
+                renderFoodData(date);
+            }
+        }
+
+        function addFood() {
+            const dateInput = document.getElementById('date-picker').value;
+            const foodName = document.getElementById('food-name').value;
+            const calorieCount = parseInt(document.getElementById('calorie-count').value, 10);
+
+            ensureDateExists(dateInput);
+
+            if (foodName && !isNaN(calorieCount)) {
+                foodData[dateInput].foods.push({ name: foodName, calories: calorieCount });
+                renderFoodData(dateInput);
+                document.getElementById('food-name').value = '';
+                document.getElementById('calorie-count').value = '';
+            }
+        }
+
+        function updateGoal() {
+            const dateInput = document.getElementById('date-picker').value;
+            const newGoal = parseInt(document.getElementById('calorie-goal').value, 10);
+
+            if (!isNaN(newGoal)) {
+                ensureDateExists(dateInput);
+                foodData[dateInput].goal = newGoal;
+                localStorage.setItem('foodData', JSON.stringify(foodData));
+                renderFoodData(dateInput); // refresh view
+            }
+        }
+
+        function viewSingleDay(date) {
+            document.getElementById('date-picker').value = date;
+            renderFoodData(date);
+        }
+
+        function showAllDays() {
+            const allDaysDiv = document.getElementById('all-days');
+            allDaysDiv.innerHTML = '<h2>All Days</h2>';
+            Object.keys(foodData).forEach(date => {
+                ensureDateExists(date);
+                const dayTotal = foodData[date].foods.reduce((total, item) => total + item.calories, 0);
+                const dayLeft = foodData[date].goal - dayTotal;
+                const dayDiv = document.createElement('div');
+
+                if (dayTotal > 0) {
+                    dayDiv.style.marginBottom = '15px';
+                    dayDiv.innerHTML = `<strong><a href='#' onclick='viewSingleDay("${date}")'>${formatDisplayDate(date)}</a></strong>: ${dayTotal} calories (Goal: ${foodData[date].goal}, Left: ${dayLeft})`;
+                    allDaysDiv.appendChild(dayDiv);
+                }
+            });
+            allDaysDiv.style.display = 'block';
+        }
+
+        window.onload = () => {
+            const today = new Date().toISOString().split('T')[0];
+            removeGlitch();
+            document.getElementById('date-picker').value = today;
+            renderFoodData(today);
+        };
+    </script>
+</head>
+<body>
+    <header>
+        <h1>Personal Calorie Counter</h1>
+        <nav>
+            <a href="#" onclick="showAllDays();">View All Days</a>
+        </nav>
+    </header>
+    <section class="calorie-counter">
+        <h2>Calorie Counter</h2>
+        <label for="date-picker">Select Date:</label>
+        <input type="date" id="date-picker" onchange="renderFoodData(this.value)">
+        <label for="calorie-goal">Calorie Goal:</label>
+        <input type="number" id="calorie-goal" placeholder="Enter your calorie goal" onchange="updateGoal()">
+        <form onsubmit="event.preventDefault(); addFood();">
+            <input type="text" id="food-name" placeholder="Food Name" required>
+            <input type="number" id="calorie-count" placeholder="Calories" required>
+            <button type="submit">Add Food</button>
+        </form>
+        <ul id="food-list" style="margin-top: 20px;"></ul>
+        <p style="text-align: center; margin-top: 20px;">Total Calories: <span id="total-calories">0</span></p>
+        <p style="text-align: center; margin-top: 10px;">Calories Left: <span id="calories-left">0</span></p>
+    </section>
+    <section id="all-days" style="margin: 30px auto; max-width: 600px; padding: 20px; background-color: #1f1f1f; border-radius: 10px; display: none;"></section>
+    <footer>
+        <p>&copy; 2025 Calorie Counter. All rights reserved.</p>
+    </footer>
+</body>
+</html>
